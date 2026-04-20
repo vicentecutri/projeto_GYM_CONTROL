@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import Login from './Login'; // Sem o "/Pages" antes, pois você já está na pasta Pages
 
 function Home() {
   return (
