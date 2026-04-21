@@ -55,7 +55,13 @@ export class UserController {
           error: "Nenhum usuário encontrado com o ID informado",
         });
       }
-      return res.status(500).json({ error: error.message });
+      if (error.name == "ZodError") {
+        return res.status(400).json({
+          error: "Dados inválidos",
+          detalhes: error.issues.map((e: any) => e.message),
+        });
+      }
+      return res.status(500).json({ error: error.message, message: error });
     }
   }
 
@@ -105,4 +111,24 @@ export class UserController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  async me(req: Request, res: Response) {
+    try {
+      const user_id = (req as any).user.id;
+      const user = await userService.me(user_id);
+      return res.status(200).json(user);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message , error: error });
+    }
+  }
+
+  async getAlunos(req: Request, res: Response) {
+    try {
+      const alunos = await userService.getAluno();
+      return res.status(200).json(alunos);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
 }

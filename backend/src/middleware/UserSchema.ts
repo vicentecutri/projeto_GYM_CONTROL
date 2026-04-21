@@ -14,7 +14,7 @@ export const userSchema = z.object({
   senha: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres" }),
 
   // O tipo só pode ser um desses três valores específicos
-  tipo: z.enum(["aluno", "instrutor", "admin"], {
+  tipo: z.enum(["aluno", "instrutor", "admin", "recepcao"], {
     error: () => ({ message: "Escolha entre ALUNO, INSTRUTOR ou ADMIN" }),
   }),
 });

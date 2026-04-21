@@ -36,6 +36,24 @@ export class UserService {
     });
   }
 
+  async me(id: string) {
+    const user = await prisma.usuarios.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
+      },
+    });
+    if (user === null) {
+      throw new Error("id inexistente");
+    }
+    return user;
+  }
+
   async findById(id: string) {
     const user = await prisma.usuarios.findUnique({
       where: {
@@ -96,4 +114,17 @@ export class UserService {
       throw error;
     }
   }
+
+  async getAluno(){
+    return await prisma.usuarios.findMany({
+      where: {
+        tipo: "aluno"
+      },
+      select: {
+        nome: true,
+        email: true,
+      },
+    });
+  }
+
 }

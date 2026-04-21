@@ -1,6 +1,4 @@
-import id from "zod/v4/locales/id.js";
 import { prisma } from "../config/prisma";
-import { number } from "zod";
 
 interface ItemTreinoDTO {
   exercicio_id: number;
@@ -18,18 +16,20 @@ interface CreateTreinoDTO {
 }
 export class TreinoService {
   async create({ aluno_id, instrutor_id, titulo, itens }: CreateTreinoDTO) {
-    
     const aluno = await prisma.usuarios.findUnique({
       where: {
-        id: aluno_id
-      }
+        id: aluno_id,
+      },
     });
 
     if (!aluno || aluno.tipo !== "aluno") {
       throw new Error("Aluno não encontrado ou não é um aluno");
     }
 
-    if(itens.map((item) => item.exercicio_id).length !== new Set(itens.map((item) => item.exercicio_id)).size) {
+    if (
+      itens.map((item) => item.exercicio_id).length !==
+      new Set(itens.map((item) => item.exercicio_id)).size
+    ) {
       throw new Error("Exercícios duplicados");
     }
 
@@ -54,9 +54,10 @@ export class TreinoService {
     });
   }
   async getTreinosPorAluno(aluno_id: string) {
-   return await prisma.treinos.findMany({
+    return await prisma.treinos.findMany({
       where: {
-        aluno_id, ativo: true
+        aluno_id,
+        ativo: true,
       },
       include: {
         itens_treino: {
@@ -64,17 +65,17 @@ export class TreinoService {
             exercicios: true,
           },
         },
-        instrutor: {select: {nome: true}},
+        instrutor: { select: { nome: true } },
       },
     });
   }
 
-  async update(id: number, {titulo, itens}: any) {
-    
+  async update(id: number, { titulo, itens }: any) {
     return await prisma.treinos.update({
       where: {
-        id
-      },data:{
+        id,
+      },
+      data: {
         titulo,
         itens_treino: {
           deleteMany: {},
@@ -93,25 +94,19 @@ export class TreinoService {
             exercicios: true,
           },
         },
-        instrutor: {select: {nome: true}},
+        instrutor: { select: { nome: true } },
       },
-    })
-  }
-
-
-  async delete(id: number){
-
-    return await prisma.treinos.update({
-      where: {
-        id
-      },
-      data: {
-        ativo: false
-      }
     });
   }
-  
 
+  async delete(id: number) {
+    return await prisma.treinos.update({
+      where: {
+        id,
+      },
+      data: {
+        ativo: false,
+      },
+    });
+  }
 }
-
-

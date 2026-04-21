@@ -8,7 +8,7 @@ export const is = (rolesPermitidas: string[]) =>{
             return res.status(401).json({ message: "Token de autenticação ausente" });
         }
         if (!rolesPermitidas.includes(user.tipo)) {
-            return res.status(403).json({ message: 'Esta rota é exclusiva para: ${rolesPermitidas.join(", ")}'
+            return res.status(403).json({ message: `Esta rota é exclusiva para: ${rolesPermitidas.join(", ")}`
             });
         
         } 

@@ -27,4 +27,25 @@ export class ExercicioService {
     });
   }
 
+  async update(id: number, {nome, grupo_muscular, descricao}: any) {
+    return await prisma.exercicios.update({
+      where: {
+        id
+      },
+      data: {
+        nome,
+        grupo_muscular,
+        descricao
+      }
+    });
+  }
+
+  async delete(id: number) {
+    return await prisma.exercicios.delete({
+      where: {
+        id
+      }
+    });
+  }
+
 }
