@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './Pages/Login'; 
 import Home from './Pages/Home';
 import Alunos from './Pages/Alunos';
+import Produtos from './Pages/Produtos';
 
 function App() {
   return (
@@ -13,7 +14,7 @@ function App() {
         
         {/* Rotas temporárias para evitar tela branca */}
         <Route path="/alunos" element={<Alunos />} />
-        <Route path="/produtos" element={<div className="bg-zinc-950 min-h-screen text-white p-10 text-2xl">Página Produtos</div>} />
+        <Route path="/produtos" element={<Produtos />} />
         <Route path="/treinos" element={<div className="bg-zinc-950 min-h-screen text-white p-10 text-2xl">Página Treinos</div>} />
       </Routes>
     </Router>
