@@ -1,5 +1,5 @@
 import  { prisma } from "../src/config/prisma";
-
+import bcrypt from "bcrypt";
 
 async function main() {
   console.log('Semeando planos...');
@@ -13,16 +13,20 @@ async function main() {
     skipDuplicates: true,
   });
 
-  const admin = await prisma.usuarios.upsert({
-    where: { email: 'admin@academia.com' },
+  const senha = 'admin123';
+  const saltRounds = 10;
+  const senhaCriptografada = await bcrypt.hash(senha, saltRounds);
+  await prisma.usuarios.upsert({
+    where: { email: 'admin@gymcontrol.com' },
     update: {},
     create: {
-      email: 'admin@academia.com',
+      email: 'admin@gymcontrol.com',
       nome: 'Administrador',
-      senha_hash: 'adm123', // idealmente use o bcrypt aqui
+      senha_hash:  senhaCriptografada, 
       tipo: 'admin',
     },
   })
+
 }
 
 
