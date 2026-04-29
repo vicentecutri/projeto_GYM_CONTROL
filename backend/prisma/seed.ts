@@ -13,8 +13,18 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log('Planos criados com sucesso!');
+  const admin = await prisma.usuarios.upsert({
+    where: { email: 'admin@academia.com' },
+    update: {},
+    create: {
+      email: 'admin@academia.com',
+      nome: 'Administrador',
+      senha_hash: 'adm123', // idealmente use o bcrypt aqui
+      tipo: 'admin',
+    },
+  })
 }
+
 
 main()
   .catch((e) => {

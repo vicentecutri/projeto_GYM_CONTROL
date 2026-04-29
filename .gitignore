@@ -4,3 +4,4 @@ dist/
 
 /generated/prisma
 /prisma/migrations/shadow_db_*
+pgdata/
