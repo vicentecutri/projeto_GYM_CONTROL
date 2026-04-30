@@ -7,6 +7,7 @@ import matriculaRouter from './routes/MatriculaRouter';
 import planoRouter from './routes/PlanoRouter';
 import cors from 'cors';
 
+
 const app = express();
 
 app.use(cors());
