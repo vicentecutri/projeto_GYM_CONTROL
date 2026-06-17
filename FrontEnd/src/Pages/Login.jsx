@@ -1,14 +1,38 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../Services/api'; // Importação da conexão configurada com a porta 8000
 
 function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleEntrar = (e) => {
+  // Transformada em função assíncrona para esperar a resposta do backend
+  const handleEntrar = async (e) => {
     e.preventDefault();
-    navigate('/home');
+
+    try {
+      // 1. Envia as credenciais para a rota /login do seu Express
+      const response = await api.post('/login', {
+        email: email,
+        senha: password // Certifique-se se o backend espera 'senha' ou 'senha_hash'
+      });
+
+      // 2. Captura o token JWT retornado pelo servidor
+      const { token } = response.data;
+
+      // 3. Salva o token no navegador para o Interceptor usar nas outras telas
+      localStorage.setItem('token', token);
+
+      // 4. Se deu tudo certo, aí sim joga para a Home/Dashboard
+      navigate('/home');
+
+    } catch (error) {
+      console.error("Erro ao tentar logar:", error.response?.data);
+      
+      // Mensagem amigável caso a senha ou email estejam errados
+      alert("Erro ao acessar: " + (error.response?.data?.message || error.response?.data?.error || "E-mail ou senha inválidos."));
+    }
   };
 
   return (

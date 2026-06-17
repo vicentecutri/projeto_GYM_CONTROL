@@ -14,7 +14,6 @@ function Produtos() {
   const [vendas, setVendas] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Estados do formulário de venda
   const [produtoNome, setProdutoNome] = useState('');
   const [quantidade, setQuantidade] = useState(1);
   const [pagamento, setPagamento] = useState('Pix');
@@ -29,7 +28,7 @@ function Produtos() {
   };
 
   useEffect(() => {
-    const carregarVendas = async () => {
+    const fetchVendas = async () => {
       try {
         const response = await api.get('/vendas');
         setVendas(response.data);
@@ -38,11 +37,15 @@ function Produtos() {
       }
     };
 
-    carregarVendas();
+    fetchVendas();
   }, []);
 
   const handleVenda = async (e) => {
     e.preventDefault();
+    if (!produtoNome) {
+      alert("Por favor, selecione um produto.");
+      return;
+    }
     try {
       await api.post('/vendas', {
         produto: produtoNome,
@@ -50,13 +53,15 @@ function Produtos() {
         forma_pagamento: pagamento,
         data: new Date()
       });
-      alert("Venda registrada!");
+      alert("Venda registrada com sucesso!");
       setIsModalOpen(false);
-      setProdutoNome(''); // Limpa o campo após salvar
+      setProdutoNome('');
+      setQuantidade(1);
+      setPagamento('Pix');
       buscarVendas();
     } catch (error) {
       console.error("Erro ao registrar venda", error);
-      alert("Erro ao registrar venda");
+      alert("Erro ao registrar venda. Verifique a API.");
     }
   };
 
@@ -71,7 +76,7 @@ function Produtos() {
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl font-bold transition-all"
+          className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-600/20"
         >
           + Registrar Venda
         </button>
@@ -91,7 +96,7 @@ function Produtos() {
           <tbody className="divide-y divide-zinc-800">
             {vendas.length > 0 ? (
               vendas.map((venda) => (
-                <tr key={venda.id} className="hover:bg-zinc-800/30">
+                <tr key={venda.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="p-5 font-semibold">{venda.produto}</td>
                   <td className="p-5">{venda.quantidade}</td>
                   <td className="p-5">{venda.forma_pagamento}</td>

@@ -4,45 +4,100 @@ import api from '../Services/api';
 
 function Alunos() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetalhesOpen, setIsDetalhesOpen] = useState(false); 
   const [alunos, setAlunos] = useState([]);
+  const [alunoSelecionado, setAlunoSelecionado] = useState(null); 
+  const [dadosFinanceiros, setDadosFinanceiros] = useState(null); // Armazena matrícula e pagamento reais
   
+  // Estado para controlar qual opção está ativa dentro do painel do aluno
+  const [opcaoAtiva, setOpcaoAtiva] = useState('consultar_matricula'); 
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+
+  // Estados para o formulário de Nova Matrícula (caso decida usar no front)
+  const [planoSelecionado, setPlanoSelecionado] = useState('');
 
   const buscarAlunos = async () => {
     try {
-      const response = await api.get('/usuarios'); 
-      setAlunos(response.data);
+      const response = await api.get('/users'); 
+      setAlunos(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error("Erro ao carregar alunos", error);
+      console.error("Erro ao carregar alunos do backend:", error);
     }
   };
 
   useEffect(() => {
-    const carregarAlunos = async () => {
-      await buscarAlunos();
-    };
+    let isMounted = true;
 
-    carregarAlunos();
+    (async () => {
+      try {
+        const response = await api.get('/users');
+        if (isMounted) setAlunos(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Erro ao carregar alunos do backend:", error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleCadastrar = async (e) => {
+  const cadastrarAluno = async (event) => {
+    event.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+
+      await api.post('/users', 
+        { nome, email, senha_hash: senha },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert("Aluno registrado com sucesso!");
+      setNome('');
+      setEmail('');
+      setSenha('');
+      setIsModalOpen(false);
+      buscarAlunos();
+    } catch (error) {
+      console.error("Erro ao cadastrar aluno:", error);
+      alert("Erro ao cadastrar: " + (error.response?.data?.mensagem || error.response?.data?.error || "Token ausente ou inválido"));
+    }
+  };
+
+  const abrirDetalhesAluno = async (aluno) => {
+    setAlunoSelecionado(aluno);
+    setIsDetalhesOpen(true);
+    setOpcaoAtiva('consultar_matricula'); // Abre por padrão na consulta
+    setDadosFinanceiros(null); 
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get(`/users/${aluno.id || aluno._id}/financeiro`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDadosFinanceiros(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar dados financeiros reais:", error);
+    }
+  };
+
+  // Função para enviar os dados e criar uma matrícula no banco
+  const handleMatricular = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/usuarios', {
-        nome: nome,
-        email: email,
-        senha_hash: "senha_padrao_123", 
-        tipo: "aluno"
+      const token = localStorage.getItem('token');
+      await api.post(`/users/${alunoSelecionado.id}/matricular`, {
+        plano: planoSelecionado
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      alert("Aluno registrado com sucesso!");
-      setIsModalOpen(false); 
-      setNome(''); 
-      setEmail('');
-      buscarAlunos(); 
+      alert("Aluno matriculado com sucesso!");
+      abrirDetalhesAluno(alunoSelecionado); // Recarrega os dados na tela
     } catch (error) {
-      alert("Erro ao cadastrar: " + (error.response?.data?.error || "Verifique o servidor"));
+      alert("Erro ao matricular: " + (error.response?.data?.error || "Tente novamente"));
     }
   };
 
@@ -63,72 +118,188 @@ function Alunos() {
         </button>
       </header>
 
-      {/* Tabela de Alunos */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
-        <table className="w-full text-left">
-          <thead className="bg-zinc-800/50 text-zinc-400 text-xs font-bold uppercase">
-            <tr>
-              <th className="p-5">Nome</th>
-              <th className="p-5">E-mail</th>
-              <th className="p-5">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800">
-            {alunos.length > 0 ? (
-              alunos.map((aluno) => (
-                <tr key={aluno.id} className="hover:bg-zinc-800/30 transition-colors">
-                  <td className="p-5 font-semibold">{aluno.nome}</td>
-                  <td className="p-5 text-zinc-400">{aluno.email}</td>
-                  <td className="p-5 text-green-500 font-bold">● Ativo</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="3" className="p-10 text-center text-zinc-600 italic">Nenhum aluno cadastrado.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal de Cadastro */}
+      {/* MODAL DE CADASTRO */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-black italic mb-6 text-red-600 uppercase">Novo Aluno</h2>
-            <form onSubmit={handleCadastrar} className="space-y-4">
-              <div>
-                <label className="text-zinc-500 text-xs font-bold uppercase block mb-2">Nome Completo</label>
-                <input 
-                  type="text" 
-                  value={nome} 
-                  onChange={(e) => setNome(e.target.value)} 
-                  className="w-full bg-zinc-800 border border-zinc-700 p-3 rounded-lg outline-none text-white focus:ring-2 focus:ring-red-600" 
-                  required 
-                />
-              </div>
-              <div>
-                <label className="text-zinc-500 text-xs font-bold uppercase block mb-2">E-mail</label>
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  className="w-full bg-zinc-800 border border-zinc-700 p-3 rounded-lg outline-none text-white focus:ring-2 focus:ring-red-600" 
-                  required 
-                />
-              </div>
-              <div className="flex gap-3 mt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 font-bold py-3 rounded-xl transition-colors">
-                  Cancelar
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-zinc-950 border border-zinc-800 p-8">
+            <h2 className="text-2xl font-bold mb-6">Cadastrar Novo Aluno</h2>
+            <form onSubmit={cadastrarAluno} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                required
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-red-600"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-red-600"
+              />
+              <input
+                type="password"
+                placeholder="Senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-red-600"
+              />
+              <div className="flex gap-4">
+                <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition">
+                  Cadastrar
                 </button>
-                <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 font-bold py-3 rounded-xl transition-colors">
-                  Salvar
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg transition">
+                  Cancelar
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* MODAL PRINCIPAL DO ALUNO COM AS 3 OPÇÕES SOLICITADAS */}
+      {isDetalhesOpen && alunoSelecionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-xl rounded-3xl bg-zinc-950 border border-zinc-800 p-8 shadow-2xl">
+            
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between mb-6 border-b border-zinc-800 pb-4">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">{alunoSelecionado.nome}</h2>
+                <p className="text-sm text-zinc-400">{alunoSelecionado.email}</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => { setIsDetalhesOpen(false); setAlunoSelecionado(null); }} 
+                className="text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-xs font-semibold"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {/* Menu de Opções Solicitado (Abas) */}
+            <div className="flex gap-2 mb-6 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+              <button
+                onClick={() => setOpcaoAtiva('matricular')}
+                className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-all ${opcaoAtiva === 'matricular' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Matricular Aluno
+              </button>
+              <button
+                onClick={() => setOpcaoAtiva('consultar_matricula')}
+                className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-all ${opcaoAtiva === 'consultar_matricula' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Consultar Matrícula
+              </button>
+              <button
+                onClick={() => setOpcaoAtiva('consultar_pagamento')}
+                className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-all ${opcaoAtiva === 'consultar_pagamento' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Consultar Pagamento
+              </button>
+            </div>
+
+            {/* Conteúdo Dinâmico baseado na opção selecionada */}
+            <div className="space-y-4 min-h-[180px]">
+              
+              {/* Conteúdo: Matricular Aluno */}
+              {opcaoAtiva === 'matricular' && (
+                <form onSubmit={handleMatricular} className="space-y-4">
+                  <div>
+                    <label className="text-sm text-zinc-400 block mb-2">Selecione o Plano de Treino</label>
+                    <select 
+                      value={planoSelecionado}
+                      onChange={(e) => setPlanoSelecionado(e.target.value)}
+                      required
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-red-600"
+                    >
+                      <option value="">-- Escolha um Plano --</option>
+                      <option value="Plano Mensal">Plano Mensal - R$ 100,00</option>
+                      <option value="Plano Trimestral">Plano Trimestral - R$ 300,00</option>
+                      <option value="Plano Anual">Plano Anual - R$ 1000,00</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">
+                    Confirmar Nova Matrícula
+                  </button>
+                </form>
+              )}
+
+              {/* Conteúdo: Consultar Matrícula */}
+              {opcaoAtiva === 'consultar_matricula' && (
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+                  <div>
+                    <p className="text-zinc-400 text-xs">ID da Matrícula Vinculada</p>
+                    <p className="text-white font-mono font-semibold">{dadosFinanceiros?.pagamento?.matricula_id || dadosFinanceiros?.matricula?.id || 'Nenhum registro encontrado'}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-400 text-xs">Status da Matrícula</p>
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${dadosFinanceiros?.matricula ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-500'}`}>
+                      {dadosFinanceiros?.matricula?.status || 'Inativa / Pendente'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Conteúdo: Consultar Pagamento */}
+              {opcaoAtiva === 'consultar_pagamento' && (
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
+                  <div className="flex justify-between border-b border-zinc-800 pb-2">
+                    <div>
+                      <p className="text-zinc-400 text-xs">Valor Recebido</p>
+                      <p className="text-white font-bold">{dadosFinanceiros?.pagamento?.valor_pago ? `R$ ${Number(dadosFinanceiros.pagamento.valor_pago).toFixed(2)}` : 'R$ 0,00'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-zinc-400 text-xs">Forma Utilizada</p>
+                      <p className="text-white font-semibold capitalize">{dadosFinanceiros?.pagamento?.metodo_pagamento || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-zinc-400 text-xs">Data da Transação</p>
+                    <p className="text-white font-semibold">
+                      {dadosFinanceiros?.pagamento?.data_pagamento ? new Date(dadosFinanceiros.pagamento.data_pagamento).toLocaleDateString('pt-BR') : '--/--/----'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LISTA DE ALUNOS */}
+      <div className="grid gap-4">
+        {alunos.length > 0 ? (
+          alunos.map((aluno) => (
+            <div
+              key={aluno.id || aluno._id}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex justify-between items-center hover:border-red-600 transition cursor-pointer"
+              onClick={() => abrirDetalhesAluno(aluno)}
+            >
+              <div>
+                <p className="font-semibold">{aluno.nome}</p>
+                <p className="text-zinc-400 text-sm">{aluno.email}</p>
+              </div>
+              <button
+                className="text-red-600 hover:text-red-500 font-bold"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Lógica de deleção opcional
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-zinc-400 text-center py-8">Nenhum aluno cadastrado</p>
+        )}
+      </div>
     </div>
   );
 }
