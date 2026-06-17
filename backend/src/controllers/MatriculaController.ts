@@ -56,4 +56,14 @@ export class MatriculaController {
         }
     }
 
+    async buscarStatusPorAluno(req: Request, res: Response) {
+        const  id = idParamSchema.parse(req.params.id);
+        try {
+            const status = await matriculaService.buscarStatusPorAluno(id);
+            return res.status(200).json(status);
+        } catch (error: any) {
+            return res.status(400).json({ message: "Erro ao buscar status", error: error.message });
+        }
+    }
+
 }

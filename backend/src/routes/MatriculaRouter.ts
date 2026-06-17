@@ -11,5 +11,6 @@ router.get("/", authMiddleware, is(["recepcao", "admin"]), matriculaController.l
 router.put("/:id", authMiddleware, is(["recepcao", "admin"]), matriculaController.atualizarMatricula);
 router.delete("/:id", authMiddleware, is(["recepcao", "admin"]), matriculaController.deletarMatricula);
 router.get("/acesso/:id", authMiddleware, is(["recepcao", "admin"]), matriculaController.verificarAcesso);
+router.get("/status/:id", authMiddleware, is(["recepcao", "admin"]), matriculaController.buscarStatusPorAluno);
 
 export default router;

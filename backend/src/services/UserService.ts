@@ -20,7 +20,6 @@ export class UserService {
         tipo: data.tipo || "aluno",
       },
     });
-   
     return { ...user, senha_hash: undefined };
   }
 

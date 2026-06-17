@@ -88,6 +88,55 @@ export class MatriculaService {
     });
   }
 
+  async buscarStatusPorAluno(aluno_id: string) {
+    // Busca a matrícula mais recente desse aluno (ativa, pendente ou cancelada)
+    const matricula = await prisma.matriculas.findFirst({
+      where: {
+        usuario_id: aluno_id,
+      },
+      include: {
+        plano: {
+          select: {
+            nome: true,
+            duracao_meses: true
+          }
+        },
+        // Se você quiser trazer o nome do aluno junto para o Front
+        usuarios: {
+          select: {
+            nome: true,
+          }
+        }
+      },
+      orderBy: {
+        data_inicio: 'desc', // Garante que pega a última/atual
+      },
+    });
+
+    if (!matricula) {
+      return { 
+        status_matricula: "inexistente", 
+        message: "Este aluno nunca possuiu uma matrícula no sistema." 
+      };
+    }
+
+    const hoje = new Date();
+    let statusReal = matricula.status;
+
+    // Validação extra: Se no banco está "ativa", mas a data já passou, ela está expirada
+    if (matricula.status === "ativa" && hoje > matricula.data_fim) {
+      statusReal = "expirada";
+    }
+
+    return {
+      aluno_nome: matricula.usuarios.nome,
+      status_matricula: statusReal, // "ativa", "cancelada", "expirada"
+      plano: matricula.plano,
+      data_inicio: matricula.data_inicio,
+      data_fim: matricula.data_fim,
+    };
+  }
+
   async virificarAcesso(id: string) {
     const matricula = await prisma.matriculas.findFirst({
       where: {
