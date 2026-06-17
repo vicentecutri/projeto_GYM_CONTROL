@@ -7,7 +7,7 @@ function Alunos() {
   const [isDetalhesOpen, setIsDetalhesOpen] = useState(false); 
   const [alunos, setAlunos] = useState([]);
   const [alunoSelecionado, setAlunoSelecionado] = useState(null); 
-  const [dadosFinanceiros, setDadosFinanceiros] = useState(null); // Armazena matrícula e pagamento reais
+  const [dadosFinanceiros, setDadosFinanceiros] = useState(null); 
   
   // Estado para controlar qual opção está ativa dentro do painel do aluno
   const [opcaoAtiva, setOpcaoAtiva] = useState('consultar_matricula'); 
@@ -16,7 +16,7 @@ function Alunos() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
 
-  // Estados para o formulário de Nova Matrícula (caso decida usar no front)
+  // Estados para o formulário de Nova Matrícula
   const [planoSelecionado, setPlanoSelecionado] = useState('');
 
   const buscarAlunos = async () => {
@@ -49,20 +49,37 @@ function Alunos() {
     event.preventDefault();
     try {
       const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
 
-      await api.post('/users', 
+      // 1. Cria o usuário no backend
+      const responseUsuario = await api.post('/users', 
         { nome, email, senha_hash: senha },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
 
-      alert("Aluno registrado com sucesso!");
+      const alunoId = responseUsuario.data?.id || responseUsuario.data?.usuario?.id || responseUsuario.data?.aluno?.id;
+
+      if (alunoId) {
+        // 2. Cria a matrícula automaticamente vinculando o plano inicial
+        const PLANO_PADRAO_ID = 1; 
+
+        await api.post('/matricula', 
+          { 
+            aluno_id: alunoId, 
+            plano_id: PLANO_PADRAO_ID 
+          },
+          { headers }
+        );
+      }
+
+      alert("Aluno registrado e matrícula vinculada automaticamente com sucesso!");
       setNome('');
       setEmail('');
       setSenha('');
       setIsModalOpen(false);
       buscarAlunos();
     } catch (error) {
-      console.error("Erro ao cadastrar aluno:", error);
+      console.error("Erro no fluxo de cadastro/matrícula:", error);
       alert("Erro ao cadastrar: " + (error.response?.data?.mensagem || error.response?.data?.error || "Token ausente ou inválido"));
     }
   };
@@ -70,34 +87,41 @@ function Alunos() {
   const abrirDetalhesAluno = async (aluno) => {
     setAlunoSelecionado(aluno);
     setIsDetalhesOpen(true);
-    setOpcaoAtiva('consultar_matricula'); // Abre por padrão na consulta
+    setOpcaoAtiva('consultar_matricula'); 
     setDadosFinanceiros(null); 
     
     try {
       const token = localStorage.getItem('token');
-      const response = await api.get(`/users/${aluno.id || aluno._id}/financeiro`, {
+      const response = await api.get(`/matricula`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      // Salva o retorno bruto vindo do banco de dados
       setDadosFinanceiros(response.data);
     } catch (error) {
       console.error("Erro ao buscar dados financeiros reais:", error);
     }
   };
 
-  // Função para enviar os dados e criar uma matrícula no banco
   const handleMatricular = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await api.post(`/users/${alunoSelecionado.id}/matricular`, {
-        plano: planoSelecionado
+      
+      let planoId = 1;
+      if (planoSelecionado === "Plano Trimestral") planoId = 2;
+      if (planoSelecionado === "Plano Anual") planoId = 3;
+
+      await api.post('/matricula', {
+        aluno_id: alunoSelecionado.id,
+        plano_id: planoId
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
       alert("Aluno matriculado com sucesso!");
-      abrirDetalhesAluno(alunoSelecionado); // Recarrega os dados na tela
+      abrirDetalhesAluno(alunoSelecionado); 
     } catch (error) {
-      alert("Erro ao matricular: " + (error.response?.data?.error || "Tente novamente"));
+      alert("Erro ao matricular: " + (error.response?.data?.error || "O aluno já possui uma matrícula ativa"));
     }
   };
 
@@ -161,7 +185,7 @@ function Alunos() {
         </div>
       )}
 
-      {/* MODAL PRINCIPAL DO ALUNO COM AS 3 OPÇÕES SOLICITADAS */}
+      {/* MODAL PRINCIPAL DO ALUNO */}
       {isDetalhesOpen && alunoSelecionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-xl rounded-3xl bg-zinc-950 border border-zinc-800 p-8 shadow-2xl">
@@ -181,7 +205,7 @@ function Alunos() {
               </button>
             </div>
 
-            {/* Menu de Opções Solicitado (Abas) */}
+            {/* Menu de Opções (Abas) */}
             <div className="flex gap-2 mb-6 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
               <button
                 onClick={() => setOpcaoAtiva('matricular')}
@@ -203,7 +227,7 @@ function Alunos() {
               </button>
             </div>
 
-            {/* Conteúdo Dinâmico baseado na opção selecionada */}
+            {/* Conteúdo Dinâmico */}
             <div className="space-y-4 min-h-[180px]">
               
               {/* Conteúdo: Matricular Aluno */}
@@ -229,39 +253,50 @@ function Alunos() {
                 </form>
               )}
 
-              {/* Conteúdo: Consultar Matrícula */}
+              {/* CORRIGIDO: Puxa o ID real da matricula_id vindo das tabelas do banco */}
               {opcaoAtiva === 'consultar_matricula' && (
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
                   <div>
-                    <p className="text-zinc-400 text-xs">ID da Matrícula Vinculada</p>
-                    <p className="text-white font-mono font-semibold">{dadosFinanceiros?.pagamento?.matricula_id || dadosFinanceiros?.matricula?.id || 'Nenhum registro encontrado'}</p>
+                    <p className="text-zinc-400 text-xs">ID da Matrícula no Banco</p>
+                    <p className="text-white font-mono text-sm font-semibold mt-1 break-all">
+                      {dadosFinanceiros?.matricula_id || dadosFinanceiros?.id || 'Nenhum registro encontrado'}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-zinc-400 text-xs">Status da Matrícula</p>
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${dadosFinanceiros?.matricula ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-500'}`}>
-                      {dadosFinanceiros?.matricula?.status || 'Inativa / Pendente'}
+                    <p className="text-zinc-400 text-xs">Status da Conta</p>
+                    {/* Como sua tabela não possui string de status fixa, inferimos se está ativa se houver id de matrícula no banco */}
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${(dadosFinanceiros?.matricula_id || dadosFinanceiros?.id) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                      {(dadosFinanceiros?.matricula_id || dadosFinanceiros?.id) ? 'ATIVA' : 'INATIVA / PENDENTE'}
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Conteúdo: Consultar Pagamento */}
+              {/* CORRIGIDO: Mapeia estritamente as colunas valor_pago, metodo_pagamento e data_pagamento */}
               {opcaoAtiva === 'consultar_pagamento' && (
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
                   <div className="flex justify-between border-b border-zinc-800 pb-2">
                     <div>
                       <p className="text-zinc-400 text-xs">Valor Recebido</p>
-                      <p className="text-white font-bold">{dadosFinanceiros?.pagamento?.valor_pago ? `R$ ${Number(dadosFinanceiros.pagamento.valor_pago).toFixed(2)}` : 'R$ 0,00'}</p>
+                      <p className="text-white font-bold mt-0.5">
+                        {dadosFinanceiros?.valor_pago 
+                          ? `R$ ${Number(dadosFinanceiros.valor_pago).toFixed(2)}` 
+                          : 'R$ 0,00'}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-zinc-400 text-xs">Forma Utilizada</p>
-                      <p className="text-white font-semibold capitalize">{dadosFinanceiros?.pagamento?.metodo_pagamento || 'N/A'}</p>
+                      <p className="text-white font-semibold uppercase mt-0.5">
+                        {dadosFinanceiros?.metodo_pagamento || 'N/A'}
+                      </p>
                     </div>
                   </div>
                   <div>
                     <p className="text-zinc-400 text-xs">Data da Transação</p>
-                    <p className="text-white font-semibold">
-                      {dadosFinanceiros?.pagamento?.data_pagamento ? new Date(dadosFinanceiros.pagamento.data_pagamento).toLocaleDateString('pt-BR') : '--/--/----'}
+                    <p className="text-white text-sm font-semibold mt-0.5">
+                      {dadosFinanceiros?.data_pagamento 
+                        ? new Date(dadosFinanceiros.data_pagamento).toLocaleDateString('pt-BR') 
+                        : '--/--/----'}
                     </p>
                   </div>
                 </div>
@@ -289,7 +324,6 @@ function Alunos() {
                 className="text-red-600 hover:text-red-500 font-bold"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Lógica de deleção opcional
                 }}
               >
                 ✕
