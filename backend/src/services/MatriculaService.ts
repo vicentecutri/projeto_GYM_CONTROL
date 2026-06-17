@@ -95,7 +95,7 @@ export class MatriculaService {
         usuario_id: aluno_id,
       },
       include: {
-        plano: {
+        planos: {
           select: {
             nome: true,
             duracao_meses: true
@@ -131,7 +131,7 @@ export class MatriculaService {
     return {
       aluno_nome: matricula.usuarios.nome,
       status_matricula: statusReal, // "ativa", "cancelada", "expirada"
-      plano: matricula.plano,
+      planos: matricula.planos.nome,
       data_inicio: matricula.data_inicio,
       data_fim: matricula.data_fim,
     };

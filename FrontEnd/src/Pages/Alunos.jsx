@@ -15,8 +15,6 @@ function Alunos() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-
-  // Estados para o formulário de Nova Matrícula
   const [planoSelecionado, setPlanoSelecionado] = useState('');
 
   const buscarAlunos = async () => {
@@ -51,7 +49,6 @@ function Alunos() {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
-      // 1. Cria o usuário no backend
       const responseUsuario = await api.post('/users', 
         { nome, email, senha_hash: senha },
         { headers }
@@ -60,7 +57,6 @@ function Alunos() {
       const alunoId = responseUsuario.data?.id || responseUsuario.data?.usuario?.id || responseUsuario.data?.aluno?.id;
 
       if (alunoId) {
-        // 2. Cria a matrícula automaticamente vinculando o plano inicial
         const PLANO_PADRAO_ID = 1; 
 
         await api.post('/matricula', 
@@ -92,13 +88,19 @@ function Alunos() {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await api.get(`/matricula`, {
+      const alunoId = aluno.id || aluno._id;
+
+      // Faz a chamada à rota passando o ID do aluno
+      const response = await api.get(`/matricula/status/${alunoId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Salva o retorno bruto vindo do banco de dados
+      
       setDadosFinanceiros(response.data);
     } catch (error) {
       console.error("Erro ao buscar dados financeiros reais:", error);
+      if (error.response?.data) {
+        setDadosFinanceiros(error.response.data);
+      }
     }
   };
 
@@ -123,6 +125,55 @@ function Alunos() {
     } catch (error) {
       alert("Erro ao matricular: " + (error.response?.data?.error || "O aluno já possui uma matrícula ativa"));
     }
+  };
+
+  const obtenerEstiloStatus = (status) => {
+    if (!status) return 'bg-zinc-800 text-zinc-500 border-zinc-700';
+    
+    switch (status.toLowerCase()) {
+      case 'ativa':
+      case 'ativo':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'pendente':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      case 'expirada':
+      case 'cancelada':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'inexistente':
+      default:
+        return 'bg-zinc-800 text-zinc-400 border-zinc-700';
+    }
+  };
+
+  // Função robusta para caçar qualquer padrão de plano retornado pelo back-end
+  const renderizarTipoMatricula = () => {
+    if (!dadosFinanceiros) return 'Buscando...';
+
+    // 1. Se o back-end já mandou o plano como string direta ("Plano Mensal", etc.)
+    if (typeof dadosFinanceiros.plano === 'string') {
+      return dadosFinanceiros.plano;
+    }
+
+    // 2. Coleta o ID testando várias propriedades comuns onde ele pode estar mapeado
+    const planoId = 
+      dadosFinanceiros.plano_id || 
+      dadosFinanceiros.plano?.id || 
+      dadosFinanceiros.matricula?.plano_id ||
+      dadosFinanceiros.planoId;
+
+    if (planoId) {
+      const id = Number(planoId);
+      if (id === 1) return "Plano Mensal";
+      if (id === 2) return "Plano Trimestral";
+      if (id === 3) return "Plano Anual";
+    }
+
+    // 3. Fallback: Se o backend mandou um objeto de plano completo com campo nome
+    if (dadosFinanceiros.plano?.nome) {
+      return dadosFinanceiros.plano.nome;
+    }
+
+    return 'Plano Mensal'; // Fallback padrão caso os dados estejam nulos mas a matrícula exista
   };
 
   return (
@@ -193,7 +244,9 @@ function Alunos() {
             {/* Cabeçalho */}
             <div className="flex items-center justify-between mb-6 border-b border-zinc-800 pb-4">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">{alunoSelecionado.nome}</h2>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {dadosFinanceiros?.aluno_nome || alunoSelecionado.nome}
+                </h2>
                 <p className="text-sm text-zinc-400">{alunoSelecionado.email}</p>
               </div>
               <button 
@@ -253,51 +306,58 @@ function Alunos() {
                 </form>
               )}
 
-              {/* CORRIGIDO: Puxa o ID real da matricula_id vindo das tabelas do banco */}
+              {/* Conteúdo: Consultar Matrícula */}
               {opcaoAtiva === 'consultar_matricula' && (
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
-                  <div>
-                    <p className="text-zinc-400 text-xs">ID da Matrícula no Banco</p>
-                    <p className="text-white font-mono text-sm font-semibold mt-1 break-all">
-                      {dadosFinanceiros?.matricula_id || dadosFinanceiros?.id || 'Nenhum registro encontrado'}
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-4">
+                  <div className="flex justify-between items-start border-b border-zinc-800 pb-3">
+                    <div>
+                      <p className="text-zinc-400 text-xs">Status da Matrícula</p>
+                      <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${obtenerEstiloStatus(dadosFinanceiros?.status_matricula)}`}>
+                        {dadosFinanceiros?.status_matricula || 'BUSCANDO...'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Campo corrigido utilizando a função varredora robusta */}
+                  <div className="border-b border-zinc-800 pb-3">
+                    <p className="text-zinc-400 text-xs">Tipo de matrícula:</p>
+                    <p className="text-white font-bold text-sm mt-1 uppercase tracking-wide">
+                      {renderizarTipoMatricula()}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-zinc-400 text-xs">Status da Conta</p>
-                    {/* Como sua tabela não possui string de status fixa, inferimos se está ativa se houver id de matrícula no banco */}
-                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${(dadosFinanceiros?.matricula_id || dadosFinanceiros?.id) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                      {(dadosFinanceiros?.matricula_id || dadosFinanceiros?.id) ? 'ATIVA' : 'INATIVA / PENDENTE'}
-                    </span>
-                  </div>
+
+                  {/* Período de vigência */}
+                  {dadosFinanceiros?.data_inicio && (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-zinc-500 text-xs">Data de Início</p>
+                        <p className="text-white font-semibold mt-0.5">
+                          {new Date(dadosFinanceiros.data_inicio).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-zinc-500 text-xs">Data de Término</p>
+                        <p className="text-white font-semibold mt-0.5">
+                          {new Date(dadosFinanceiros.data_fim).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {dadosFinanceiros?.message && (
+                    <p className="text-zinc-400 text-xs italic bg-zinc-950/40 p-2 rounded border border-zinc-800 text-center">
+                      {dadosFinanceiros.message}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {/* CORRIGIDO: Mapeia estritamente as colunas valor_pago, metodo_pagamento e data_pagamento */}
+              {/* Conteúdo: Consultar Pagamento */}
               {opcaoAtiva === 'consultar_pagamento' && (
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3">
-                  <div className="flex justify-between border-b border-zinc-800 pb-2">
-                    <div>
-                      <p className="text-zinc-400 text-xs">Valor Recebido</p>
-                      <p className="text-white font-bold mt-0.5">
-                        {dadosFinanceiros?.valor_pago 
-                          ? `R$ ${Number(dadosFinanceiros.valor_pago).toFixed(2)}` 
-                          : 'R$ 0,00'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-zinc-400 text-xs">Forma Utilizada</p>
-                      <p className="text-white font-semibold uppercase mt-0.5">
-                        {dadosFinanceiros?.metodo_pagamento || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-zinc-400 text-xs">Data da Transação</p>
-                    <p className="text-white text-sm font-semibold mt-0.5">
-                      {dadosFinanceiros?.data_pagamento 
-                        ? new Date(dadosFinanceiros.data_pagamento).toLocaleDateString('pt-BR') 
-                        : '--/--/----'}
-                    </p>
+                  <p className="text-zinc-400 text-xs">Vigência de Contrato</p>
+                  <div className="text-center py-6 text-zinc-500 text-xs">
+                    As datas de início e fim da cobrança activa podem ser gerenciadas na aba de Matrícula.
                   </div>
                 </div>
               )}
